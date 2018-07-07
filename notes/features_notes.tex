@@ -1,0 +1,324 @@
+\documentclass[10pt,a4paper]{article}
+\usepackage[utf8]{inputenc}
+\usepackage{amsmath}
+\usepackage{amsfonts}
+\usepackage{amssymb}
+\usepackage{makeidx}
+\usepackage{graphicx}
+\usepackage{lmodern}
+\usepackage{kpfonts}
+\usepackage[left=2cm,right=2cm,top=2cm,bottom=2cm]{geometry}
+\usepackage{listings}
+
+\title{Catalog of auxiliary visualization functions in rpart and randomForest}
+\begin{document}
+\maketitle
+\pagenumbering{gobble}
+\newpage
+\tableofcontents
+\newpage
+\pagenumbering{arabic}
+\section{rpart}
+\subsection{Visualizing trees}
+\bigskip
+\paragraph*{plot.raprt}
+\paragraph{plot.raprt}
+\begin{lstlisting}[language=R]
+plot.rpart <- function(x, uniform = FALSE, branch = 1, compress = FALSE,
+                       nspace, margin = 0, minbranch = 0.3, ...)
+{
+    if (!inherits(x, "rpart")) stop("Not a legitimate \"rpart\" object")
+    if (nrow(x$frame) <= 1L) stop("fit is not a tree, just a root")
+
+    if (compress & missing(nspace)) nspace <- branch
+    if (!compress) nspace <- -1L     # means no compression
+    ## if (dev.cur() == 1L) dev.new() # not needed in R
+
+    parms <- list(uniform = uniform, branch = branch, nspace = nspace,
+                 minbranch = minbranch)
+
+    ## define the plot region
+    temp <- rpartco(x, parms)
+    xx <- temp$x
+    yy <- temp$y
+    temp1 <- range(xx) + diff(range(xx)) * c(-margin, margin)
+    temp2 <- range(yy) + diff(range(yy)) * c(-margin, margin)
+    plot(temp1, temp2, type = "n", axes = FALSE, xlab = "", ylab = "", ...)
+    ## Save information per device, once a new device is opened.
+    assign(paste0("device", dev.cur()), parms, envir = rpart_env)
+
+    # Draw a series of horseshoes or V's, left son, up, down to right son
+    #   NA's in the vector cause lines() to "lift the pen"
+    node <- as.numeric(row.names(x$frame))
+    temp <- rpart.branch(xx, yy, node, branch)
+
+    if (branch > 0) text(xx[1L], yy[1L], "|")
+    lines(c(temp$x), c(temp$y))
+    invisible(list(x = xx, y = yy))
+}
+\end{lstlisting}
+\paragraph*{text.rpart}
+\paragraph{text.rpart}
+\begin{lstlisting}[language=R]
+## This is a modification of text.tree.
+## Fancy option has been added in (to mimic post.tree)
+##
+
+text.rpart <-
+    function(x, splits = TRUE, label, FUN = text, all = FALSE,
+             pretty = NULL, digits = getOption("digits") - 3L,
+             use.n = FALSE, fancy = FALSE, fwidth = 0.8, fheight = 0.8,
+             bg = par("bg"), minlength = 1L, ...)
+{
+    if (!inherits(x, "rpart")) stop("Not a legitimate \"rpart\" object")
+    if (nrow(x$frame) <= 1L) stop("fit is not a tree, just a root")
+
+    frame <- x$frame
+    if (!missing(label)) warning("argument 'label' is no longer used")
+    col <- names(frame)
+    ylevels <- attr(x, "ylevels")
+    if (!is.null(ylevels <- attr(x, "ylevels"))) col <- c(col, ylevels)
+    cxy <- par("cxy")                   # character width and height
+    if (!is.null(srt <- list(...)$srt) && srt == 90) cxy <- rev(cxy)
+    xy <- rpartco(x)
+
+    node <- as.numeric(row.names(frame))
+    is.left <- (node %% 2L == 0L)            # left hand sons
+    node.left <- node[is.left]
+    parent <- match(node.left/2L, node)
+
+    ## Put left splits at the parent node
+    if (splits) {
+        left.child <- match(2L * node, node)
+        right.child <- match(node * 2L + 1L, node)
+        rows <- if (!missing(pretty) && missing(minlength))
+            labels(x, pretty = pretty) else labels(x, minlength = minlength)
+        if (fancy) {
+            ## put split labels on branches instead of nodes
+            xytmp <- rpart.branch(x = xy$x, y = xy$y, node = node)
+            leftptx <- (xytmp$x[2L, ] + xytmp$x[1L, ])/2
+            leftpty <- (xytmp$y[2L, ] + xytmp$y[1L, ])/2
+            rightptx <- (xytmp$x[3L, ] + xytmp$x[4L, ])/2
+            rightpty <- (xytmp$y[3L, ] + xytmp$y[4L, ])/2
+
+            FUN(leftptx, leftpty + 0.52 * cxy[2L],
+                rows[left.child[!is.na(left.child)]], ...)
+            FUN(rightptx, rightpty - 0.52 * cxy[2L],
+                rows[right.child[!is.na(right.child)]], ...)
+        } else
+            FUN(xy$x, xy$y + 0.5 * cxy[2L], rows[left.child], ...)
+    }
+
+    leaves <- if (all) rep(TRUE, nrow(frame)) else frame$var == "<leaf>"
+
+    stat <-
+        x$functions$text(yval = if (is.null(frame$yval2)) frame$yval[leaves]
+                                else frame$yval2[leaves, ],
+                         dev = frame$dev[leaves], wt = frame$wt[leaves],
+                         ylevel = ylevels, digits = digits,
+                         n = frame$n[leaves], use.n = use.n)
+
+    if (fancy) {
+        if (col2rgb(bg, alpha = TRUE)[4L, 1L] < 255) bg <- "white"
+        oval <- function(middlex, middley, a, b)
+        {
+            theta <- seq(0, 2 * pi, pi/30)
+            newx <- middlex + a * cos(theta)
+            newy <- middley + b * sin(theta)
+            polygon(newx, newy, border = TRUE, col = bg)
+        }
+
+        ## FIXME: use rect()
+        rectangle <- function(middlex, middley, a, b)
+        {
+            newx <- middlex + c(a, a, -a, -a)
+            newy <- middley + c(b, -b, -b, b)
+            polygon(newx, newy, border = TRUE, col = bg)
+        }
+
+        ## find maximum length of stat
+        maxlen <- max(string.bounding.box(stat)$columns) + 1L
+        maxht <- max(string.bounding.box(stat)$rows) + 1L
+
+        a.length <- if (fwidth < 1)  fwidth * cxy[1L] * maxlen else fwidth * cxy[1L]
+
+        b.length <- if (fheight < 1) fheight * cxy[2L] * maxht else fheight * cxy[2L]
+
+        ## create ovals and rectangles here
+        ## sqrt(2) creates the smallest oval that fits around the
+        ## best fitting rectangle
+        for (i in parent)
+            oval(xy$x[i], xy$y[i], sqrt(2) * a.length/2, sqrt(2) * b.length/2)
+        child <- match(node[frame$var == "<leaf>"], node)
+        for (i in child)
+            rectangle(xy$x[i], xy$y[i], a.length/2, b.length/2)
+    }
+
+    ##if FUN=text then adj=1 puts the split label to the left of the
+    ##    split rather than centered
+    ##Allow labels at all or just leaf nodes
+
+    ## stick values on nodes
+    if (fancy) FUN(xy$x[leaves], xy$y[leaves] + 0.5 * cxy[2L], stat, ...)
+    else FUN(xy$x[leaves], xy$y[leaves] - 0.5 * cxy[2L], stat, adj = 0.5, ...)
+
+    invisible()
+}
+\end{lstlisting}
+\subsection{Variable importance}
+\bigskip
+\paragraph*{importance.rpart}
+\paragraph{importance.rpart}
+\begin{lstlisting}[language=R]
+#
+# Caclulate variable importance
+# Each primary split is credited with the value of splits$improve
+# Each surrogate split gets split$adj times the primary split's value
+#
+# Called only internally by rpart
+#
+importance <- function(fit)
+{
+    ff <- fit$frame
+    fpri <- which(ff$var != "<leaf>")  # points to primary splits in ff
+    spri <- 1 + cumsum(c(0, 1 + ff$ncompete[fpri] + ff$nsurrogate[fpri]))
+    spri <- spri[seq_along(fpri)] # points to primaries in the splits matrix
+    nsurr <- ff$nsurrogate[fpri]  # number of surrogates each has
+
+    sname <- vector("list", length(fpri))
+    sval <- sname
+
+    ## The importance for primary splits needs to be scaled
+    ## It was a printout choice for the anova method to list % improvement in
+    ##  the sum of squares, an importance calculation needs the total SS.
+    ## All the other methods report an unscaled change.
+     scaled.imp <- if (fit$method == "anova")
+        fit$splits[spri, "improve"] * ff$dev[fpri]
+    else fit$splits[spri, "improve"]
+
+    sdim <- rownames(fit$splits)
+    for (i in seq_along(fpri)) {
+        ## points to surrogates
+        if (nsurr[i] > 0L) {
+            indx <- spri[i] + ff$ncompete[fpri[i]] + seq_len(nsurr[i])
+            sname[[i]] <- sdim[indx]
+            sval[[i]] <- scaled.imp[i] * fit$splits[indx, "adj"]
+        }
+    }
+
+    import <- tapply(c(scaled.imp, unlist(sval)),
+                     c(as.character(ff$var[fpri]), unlist(sname)),
+                     sum)
+    sort(c(import), decreasing = TRUE) # a named vector
+}
+\end{lstlisting}         
+\section{randomForest}
+\subsection{Visualizing trees}
+\bigskip
+\paragraph*{plot.randomForest}
+\paragraph{plot.randomForest}
+\begin{lstlisting}[language=R]
+plot.randomForest <- function(x, type="l", main=deparse(substitute(x)), ...) {
+  if(x$type == "unsupervised")
+    stop("No plot for unsupervised randomForest.")
+  test <- !(is.null(x$test$mse) || is.null(x$test$err.rate))
+  if(x$type == "regression") {
+    err <- x$mse
+    if(test) err <- cbind(err, x$test$mse)
+  } else {
+    err <- x$err.rate
+    if(test) err <- cbind(err, x$test$err.rate)
+  }
+  if(test) {
+    colnames(err) <- c("OOB", "Test")
+    matplot(1:x$ntree, err, type = type, xlab="trees", ylab="Error",
+            main=main, ...)
+  } else {
+    matplot(1:x$ntree, err, type = type, xlab="trees", ylab="Error",
+            main=main, ...)
+  }
+  invisible(err)
+}
+\end{lstlisting}
+\subsection{Variable importance}
+\bigskip
+\paragraph*{importance.randomForest}
+\paragraph{importance.randomForest}
+\begin{lstlisting}[language=R]
+importance <- function(x, ...)  UseMethod("importance")
+
+importance.default <- function(x, ...)
+    stop("No method implemented for this class of object")
+
+importance.randomForest <- function(x, type=NULL, class=NULL, scale=TRUE,
+                                    ...) {
+    if (!inherits(x, "randomForest"))
+        stop("x is not of class randomForest")
+    classRF <- x$type != "regression"
+    hasImp <- !is.null(dim(x$importance)) || ncol(x$importance) == 1
+    hasType <- !is.null(type)
+    if (hasType && type == 1 && !hasImp)
+        stop("That measure has not been computed")
+    allImp <- is.null(type) && hasImp
+    if (hasType) {
+        if (!(type %in% 1:2)) stop("Wrong type specified")
+        if (type == 2 && !is.null(class))
+            stop("No class-specific measure for that type")
+    }
+    
+    imp <- x$importance
+    if (hasType && type == 2) {
+        if (hasImp) imp <- imp[, ncol(imp), drop=FALSE]
+    } else {
+        if (scale) {
+            SD <- x$importanceSD
+            imp[, -ncol(imp)] <-
+                imp[, -ncol(imp), drop=FALSE] /
+                    ifelse(SD < .Machine$double.eps, 1, SD)
+        }
+        if (!allImp) {
+            if (is.null(class)) {
+                ## The average decrease in accuracy measure:
+                imp <- imp[, ncol(imp) - 1, drop=FALSE]
+            } else {
+                whichCol <- if (classRF) match(class, colnames(imp)) else 1
+                if (is.na(whichCol)) stop(paste("Class", class, "not found."))
+                imp <- imp[, whichCol, drop=FALSE]
+            }
+        }
+    }
+    imp
+}
+\end{lstlisting}
+\paragraph*{varImpPlot.randomForest}
+\paragraph{varImpPlot.randomForest}
+\begin{lstlisting}[language=R]
+varImpPlot <- function(x, sort=TRUE,
+                       n.var=min(30, nrow(x$importance)),
+                       type=NULL, class=NULL, scale=TRUE, 
+                       main=deparse(substitute(x)), ...) {
+    if (!inherits(x, "randomForest"))
+        stop("This function only works for objects of class `randomForest'")
+    imp <- importance(x, class=class, scale=scale, type=type, ...)
+    ## If there are more than two columns, just use the last two columns.
+    if (ncol(imp) > 2) imp <- imp[, -(1:(ncol(imp) - 2))]
+    nmeas <- ncol(imp)
+    if (nmeas > 1) {
+        op <- par(mfrow=c(1, 2), mar=c(4, 5, 4, 1), mgp=c(2, .8, 0),
+                  oma=c(0, 0, 2, 0), no.readonly=TRUE)
+        on.exit(par(op))
+    }
+    for (i in 1:nmeas) {
+        ord <- if (sort) rev(order(imp[,i],
+                                   decreasing=TRUE)[1:n.var]) else 1:n.var
+        xmin <- if (colnames(imp)[i] %in%
+                    c("IncNodePurity", "MeanDecreaseGini")) 0 else min(imp[ord, i])
+        dotchart(imp[ord,i], xlab=colnames(imp)[i], ylab="",
+                 main=if (nmeas == 1) main else NULL,
+                 xlim=c(xmin, max(imp[,i])), ...)
+    }
+    if (nmeas > 1) mtext(outer=TRUE, side=3, text=main, cex=1.2)
+    invisible(imp)
+}
+\end{lstlisting}
+\end{document}
