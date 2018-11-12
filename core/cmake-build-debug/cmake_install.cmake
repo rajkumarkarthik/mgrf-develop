@@ -1,4 +1,4 @@
-# Install script for directory: /Users/karthikrajkumar/Git/grf-develop/core
+# Install script for directory: /Users/karthikrajkumar/Git/mgrf-develop/core
 
 # Set the install prefix
 if(NOT DEFINED CMAKE_INSTALL_PREFIX)
@@ -40,5 +40,5 @@ endif()
 
 string(REPLACE ";" "\n" CMAKE_INSTALL_MANIFEST_CONTENT
        "${CMAKE_INSTALL_MANIFEST_FILES}")
-file(WRITE "/Users/karthikrajkumar/Git/grf-develop/core/cmake-build-debug/${CMAKE_INSTALL_MANIFEST}"
+file(WRITE "/Users/karthikrajkumar/Git/mgrf-develop/core/cmake-build-debug/${CMAKE_INSTALL_MANIFEST}"
      "${CMAKE_INSTALL_MANIFEST_CONTENT}")
