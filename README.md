@@ -12,8 +12,8 @@ This repo is a fork from https://github.com/swager/grf and will be merged back i
 ### Authors
 
 The MGRF version of GRF is written by Karthik Rajkumar (krajkumar@stanford.edu) and the overall GRF package is written and maintained by Julie Tibshirani (jtibs@cs.stanford.edu), Susan Athey, and Stefan Wager. If you use MGRF, please cite it in your work as
-Karthik Rajkumar, Susan Athey, Stefan Wager, and Julie Tibshirani.
-<b>Multivariate Generalized Random Forests</b>, 2017.
+
+Karthik Rajkumar, Susan Athey, Stefan Wager, and Julie Tibshirani. <b>Multivariate Generalized Random Forests</b>, 2017.
 
 The repository first started as a fork of the [ranger](https://github.com/imbs-hl/ranger) repository -- we owe a great deal of thanks to the ranger authors for their useful and free package.
 
