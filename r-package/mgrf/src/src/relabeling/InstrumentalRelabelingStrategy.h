@@ -1,0 +1,43 @@
+/*-------------------------------------------------------------------------------
+  This file is part of generalized random forest (mgrf).
+
+  mgrf is free software: you can redistribute it and/or modify
+  it under the terms of the GNU General Public License as published by
+  the Free Software Foundation, either version 3 of the License, or
+  (at your option) any later version.
+
+  mgrf is distributed in the hope that it will be useful,
+  but WITHOUT ANY WARRANTY; without even the implied warranty of
+  MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE. See the
+  GNU General Public License for more details.
+
+  You should have received a copy of the GNU General Public License
+  along with mgrf. If not, see <http://www.gnu.org/licenses/>.
+ #-------------------------------------------------------------------------------*/
+
+#ifndef MGRF_INSTRUMENTALRELABELINGSTRATEGY_H
+#define MGRF_INSTRUMENTALRELABELINGSTRATEGY_H
+
+#include <unordered_map>
+#include <vector>
+#include "commons/Observations.h"
+#include "tree/Tree.h"
+#include "relabeling/RelabelingStrategy.h"
+
+class InstrumentalRelabelingStrategy: public RelabelingStrategy {
+public:
+  InstrumentalRelabelingStrategy();
+
+  InstrumentalRelabelingStrategy(double split_regularization);
+
+    std::unordered_map<size_t, Eigen::VectorXd> relabel(
+      const std::vector<size_t>& samples,
+      const Observations& observations);
+
+  DISALLOW_COPY_AND_ASSIGN(InstrumentalRelabelingStrategy);
+
+private:
+  double split_regularization;
+};
+
+#endif //MGRF_INSTRUMENTALRELABELINGSTRATEGY_H
